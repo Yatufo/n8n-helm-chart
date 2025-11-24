@@ -1,0 +1,52 @@
+suite: main deployment
+templates:
+  - templates/deployment.yaml
+tests:
+  - it: renders replica count when autoscaling is disabled
+    set:
+      main:
+        replicaCount: 3
+        autoscaling:
+          enabled: false
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 3
+
+  - it: omits replica count when autoscaling is enabled
+    set:
+      main:
+        autoscaling:
+          enabled: true
+    asserts:
+      - notExists:
+          path: spec.replicas
+
+  - it: exposes custom http port from values
+    set:
+      main:
+        config:
+          n8n:
+            port: 8080
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].containerPort
+          value: 8080
+
+  - it: renders additional environment variables
+    set:
+      main:
+        extraEnv:
+          N8N_FEATURE_FLAG:
+            value: "enterprise"
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.containers[0].env
+          count: 1
+      - equal:
+          path: spec.template.spec.containers[0].env[0].name
+          value: N8N_FEATURE_FLAG
+      - equal:
+          path: spec.template.spec.containers[0].env[0].value
+          value: enterprise
+
