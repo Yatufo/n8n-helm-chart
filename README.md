@@ -8,6 +8,8 @@
 > [join the discussion](https://github.com/8gears/n8n-helm-chart/discussions/90).
 
 
+#Comment
+
 # n8n Helm Chart for Kubernetes
 
 [n8n](https://github.com/n8n-io/n8n) is an extendable workflow automation tool.
