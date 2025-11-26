@@ -1,0 +1,104 @@
+suite: persistent volume claim
+templates:
+  - templates/pvc.yaml
+tests:
+  - it: does not render when persistence is disabled
+    set:
+      main:
+        persistence:
+          enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: does not render when existingClaim is set
+    set:
+      main:
+        persistence:
+          enabled: true
+          existingClaim: my-existing-pvc
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders when persistence is enabled with dynamic type
+    set:
+      main:
+        persistence:
+          enabled: true
+          type: dynamic
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: kind
+          value: PersistentVolumeClaim
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-n8n
+
+  - it: renders storage size
+    set:
+      main:
+        persistence:
+          enabled: true
+          type: dynamic
+          size: 10Gi
+    asserts:
+      - equal:
+          path: spec.resources.requests.storage
+          value: 10Gi
+
+  - it: renders access modes
+    set:
+      main:
+        persistence:
+          enabled: true
+          type: dynamic
+          accessModes:
+            - ReadWriteOnce
+            - ReadOnlyMany
+    asserts:
+      - equal:
+          path: spec.accessModes[0]
+          value: ReadWriteOnce
+      - equal:
+          path: spec.accessModes[1]
+          value: ReadOnlyMany
+
+  - it: renders storage class when specified
+    set:
+      main:
+        persistence:
+          enabled: true
+          type: dynamic
+          storageClass: fast-ssd
+    asserts:
+      - equal:
+          path: spec.storageClassName
+          value: fast-ssd
+
+  - it: renders empty storageClassName when set to "-"
+    set:
+      main:
+        persistence:
+          enabled: true
+          type: dynamic
+          storageClass: "-"
+    asserts:
+      - equal:
+          path: spec.storageClassName
+          value: ""
+
+  - it: renders PVC annotations
+    set:
+      main:
+        persistence:
+          enabled: true
+          type: dynamic
+          annotations:
+            "helm.sh/resource-policy": keep
+    asserts:
+      - exists:
+          path: metadata.annotations
+

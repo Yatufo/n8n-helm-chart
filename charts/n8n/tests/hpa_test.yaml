@@ -1,0 +1,114 @@
+suite: horizontal pod autoscaler
+templates:
+  - templates/hpa.yaml
+tests:
+  - it: does not render when autoscaling is disabled
+    set:
+      main:
+        autoscaling:
+          enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders when autoscaling is enabled
+    set:
+      main:
+        autoscaling:
+          enabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: kind
+          value: HorizontalPodAutoscaler
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-n8n
+
+  - it: renders min and max replicas
+    set:
+      main:
+        autoscaling:
+          enabled: true
+          minReplicas: 2
+          maxReplicas: 10
+    asserts:
+      - equal:
+          path: spec.minReplicas
+          value: 2
+      - equal:
+          path: spec.maxReplicas
+          value: 10
+
+  - it: renders scaleTargetRef
+    set:
+      main:
+        autoscaling:
+          enabled: true
+    asserts:
+      - equal:
+          path: spec.scaleTargetRef.apiVersion
+          value: apps/v1
+      - equal:
+          path: spec.scaleTargetRef.kind
+          value: Deployment
+      - equal:
+          path: spec.scaleTargetRef.name
+          value: RELEASE-NAME-n8n
+
+  - it: renders CPU metric when targetCPUUtilizationPercentage is set
+    set:
+      main:
+        autoscaling:
+          enabled: true
+          targetCPUUtilizationPercentage: 80
+    asserts:
+      - exists:
+          path: spec.metrics
+      - equal:
+          path: spec.metrics[0].type
+          value: Resource
+      - equal:
+          path: spec.metrics[0].resource.name
+          value: cpu
+      - equal:
+          path: spec.metrics[0].resource.target.averageUtilization
+          value: 80
+
+  - it: renders memory metric when only targetMemoryUtilizationPercentage is set
+    set:
+      main:
+        autoscaling:
+          enabled: true
+          targetMemoryUtilizationPercentage: 70
+          targetCPUUtilizationPercentage: null
+    asserts:
+      - exists:
+          path: spec.metrics
+      - equal:
+          path: spec.metrics[0].resource.name
+          value: memory
+      - equal:
+          path: spec.metrics[0].resource.target.averageUtilization
+          value: 70
+
+  - it: renders both CPU and memory metrics
+    set:
+      main:
+        autoscaling:
+          enabled: true
+          targetCPUUtilizationPercentage: 80
+          targetMemoryUtilizationPercentage: 70
+    asserts:
+      - lengthEqual:
+          path: spec.metrics
+          count: 2
+      # CPU comes first, then memory
+      - equal:
+          path: spec.metrics[0].resource.name
+          value: cpu
+      - equal:
+          path: spec.metrics[1].resource.name
+          value: memory
+

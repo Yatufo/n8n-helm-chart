@@ -1,0 +1,111 @@
+suite: worker deployment
+templates:
+  - templates/deployment.worker.yaml
+tests:
+  - it: does not render when worker is disabled
+    set:
+      worker:
+        enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders when worker is enabled
+    set:
+      worker:
+        enabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: kind
+          value: Deployment
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-n8n-worker
+
+  - it: renders replica count when autoscaling is disabled
+    set:
+      worker:
+        enabled: true
+        replicaCount: 3
+        autoscaling:
+          enabled: false
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 3
+
+  - it: omits replica count when autoscaling is enabled
+    set:
+      worker:
+        enabled: true
+        autoscaling:
+          enabled: true
+    asserts:
+      - notExists:
+          path: spec.replicas
+
+  - it: renders worker container name
+    set:
+      worker:
+        enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: n8n-worker
+
+  - it: renders worker type label
+    set:
+      worker:
+        enabled: true
+    asserts:
+      - exists:
+          path: spec.selector.matchLabels
+      - exists:
+          path: spec.template.metadata.labels
+
+  - it: renders worker configMapRef when config is set
+    set:
+      worker:
+        enabled: true
+        config:
+          n8n:
+            queue_bull_redis_host: redis
+    asserts:
+      - exists:
+          path: spec.template.spec.containers[0].envFrom
+      - equal:
+          path: spec.template.spec.containers[0].envFrom[0].configMapRef.name
+          value: RELEASE-NAME-n8n-worker-config
+
+  - it: renders main configMapRef when main.config is set
+    set:
+      worker:
+        enabled: true
+      main:
+        config:
+          n8n:
+            port: 5678
+    asserts:
+      - exists:
+          path: spec.template.spec.containers[0].envFrom[0].configMapRef
+      - equal:
+          path: spec.template.spec.containers[0].envFrom[0].configMapRef.name
+          value: RELEASE-NAME-n8n-app-config
+
+  - it: renders deployment strategy
+    set:
+      worker:
+        enabled: true
+        deploymentStrategy:
+          type: RollingUpdate
+          maxSurge: "50%"
+    asserts:
+      - equal:
+          path: spec.strategy.type
+          value: RollingUpdate
+      - equal:
+          path: spec.strategy.rollingUpdate.maxSurge
+          value: "50%"
+

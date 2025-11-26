@@ -50,3 +50,205 @@ tests:
           path: spec.template.spec.containers[0].env[0].value
           value: enterprise
 
+  - it: renders deployment strategy as Recreate
+    set:
+      main:
+        deploymentStrategy:
+          type: Recreate
+    asserts:
+      - equal:
+          path: spec.strategy.type
+          value: Recreate
+
+  - it: renders RollingUpdate strategy with custom values
+    set:
+      main:
+        deploymentStrategy:
+          type: RollingUpdate
+          maxSurge: "50%"
+          maxUnavailable: "50%"
+    asserts:
+      - equal:
+          path: spec.strategy.type
+          value: RollingUpdate
+      - equal:
+          path: spec.strategy.rollingUpdate.maxSurge
+          value: "50%"
+      - equal:
+          path: spec.strategy.rollingUpdate.maxUnavailable
+          value: "50%"
+
+  - it: renders default RollingUpdate values when not specified
+    set:
+      main:
+        deploymentStrategy:
+          type: RollingUpdate
+    asserts:
+      - equal:
+          path: spec.strategy.rollingUpdate.maxSurge
+          value: "25%"
+      - equal:
+          path: spec.strategy.rollingUpdate.maxUnavailable
+          value: "25%"
+
+  - it: renders image with custom tag
+    set:
+      image:
+        repository: n8nio/n8n
+        tag: "1.100.0"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: n8nio/n8n:1.100.0
+
+  - it: renders image with appVersion when tag is empty
+    set:
+      image:
+        repository: n8nio/n8n
+        tag: ""
+    release:
+      app_version: "1.116.2"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: n8nio/n8n:1.116.2
+
+  - it: renders configMapRef when main.config is set
+    set:
+      main:
+        config:
+          n8n:
+            port: 5678
+    asserts:
+      - exists:
+          path: spec.template.spec.containers[0].envFrom[0].configMapRef
+      - equal:
+          path: spec.template.spec.containers[0].envFrom[0].configMapRef.name
+          value: RELEASE-NAME-n8n-app-config
+
+  - it: renders secretRef when main.secret is set
+    set:
+      main:
+        secret:
+          n8n:
+            encryption_key: "secret-key"
+    asserts:
+      - exists:
+          path: spec.template.spec.containers[0].envFrom[0].secretRef
+      - equal:
+          path: spec.template.spec.containers[0].envFrom[0].secretRef.name
+          value: RELEASE-NAME-n8n-app-secret
+
+  - it: renders emptyDir volume when persistence is disabled
+    set:
+      main:
+        persistence:
+          enabled: false
+    asserts:
+      - equal:
+          path: spec.template.spec.volumes[0].name
+          value: data
+      - exists:
+          path: spec.template.spec.volumes[0].emptyDir
+
+  - it: renders PVC when persistence is enabled with dynamic type
+    set:
+      main:
+        persistence:
+          enabled: true
+          type: dynamic
+    asserts:
+      - exists:
+          path: spec.template.spec.volumes[0].persistentVolumeClaim
+      - equal:
+          path: spec.template.spec.volumes[0].persistentVolumeClaim.claimName
+          value: RELEASE-NAME-n8n
+
+  - it: renders existingClaim when persistence uses existing PVC
+    set:
+      main:
+        persistence:
+          enabled: true
+          type: existing
+          existingClaim: my-existing-pvc
+    asserts:
+      - exists:
+          path: spec.template.spec.volumes[0].persistentVolumeClaim
+      - equal:
+          path: spec.template.spec.volumes[0].persistentVolumeClaim.claimName
+          value: my-existing-pvc
+
+  - it: renders resources when specified
+    set:
+      main:
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].resources.requests.cpu
+          value: 100m
+      - equal:
+          path: spec.template.spec.containers[0].resources.requests.memory
+          value: 128Mi
+      - equal:
+          path: spec.template.spec.containers[0].resources.limits.cpu
+          value: 500m
+      - equal:
+          path: spec.template.spec.containers[0].resources.limits.memory
+          value: 512Mi
+
+  - it: renders podSecurityContext
+    set:
+      main:
+        podSecurityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          fsGroup: 1000
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.runAsNonRoot
+          value: true
+      - equal:
+          path: spec.template.spec.securityContext.runAsUser
+          value: 1000
+      - equal:
+          path: spec.template.spec.securityContext.fsGroup
+          value: 1000
+
+  - it: renders terminationGracePeriodSeconds
+    set:
+      main:
+        terminationGracePeriodSeconds: 60
+    asserts:
+      - equal:
+          path: spec.template.spec.terminationGracePeriodSeconds
+          value: 60
+
+  - it: renders nodeSelector when specified
+    set:
+      main:
+        nodeSelector:
+          kubernetes.io/os: linux
+    asserts:
+      - exists:
+          path: spec.template.spec.nodeSelector
+
+  - it: renders initContainers when specified
+    set:
+      main:
+        initContainers:
+          - name: init-data-dir
+            image: busybox
+            command: ["mkdir", "-p", "/data"]
+    asserts:
+      - exists:
+          path: spec.template.spec.initContainers
+      - equal:
+          path: spec.template.spec.initContainers[0].name
+          value: init-data-dir
+

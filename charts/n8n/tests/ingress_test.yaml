@@ -1,0 +1,113 @@
+suite: ingress
+templates:
+  - templates/ingress.yaml
+tests:
+  - it: does not render when ingress is disabled
+    set:
+      ingress:
+        enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders when ingress is enabled
+    set:
+      ingress:
+        enabled: true
+        hosts:
+          - host: n8n.example.com
+            paths: []
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: kind
+          value: Ingress
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-n8n
+
+  - it: renders ingress host
+    set:
+      ingress:
+        enabled: true
+        hosts:
+          - host: n8n.example.com
+            paths: []
+    asserts:
+      - equal:
+          path: spec.rules[0].host
+          value: n8n.example.com
+
+  - it: renders ingress className
+    set:
+      ingress:
+        enabled: true
+        className: nginx
+        hosts:
+          - host: n8n.example.com
+            paths: []
+    asserts:
+      - equal:
+          path: spec.ingressClassName
+          value: nginx
+
+  - it: renders TLS configuration
+    set:
+      ingress:
+        enabled: true
+        hosts:
+          - host: n8n.example.com
+            paths: []
+        tls:
+          - hosts:
+              - n8n.example.com
+            secretName: n8n-tls
+    asserts:
+      - exists:
+          path: spec.tls
+      - equal:
+          path: spec.tls[0].hosts[0]
+          value: n8n.example.com
+      - equal:
+          path: spec.tls[0].secretName
+          value: n8n-tls
+
+  - it: renders ingress annotations
+    set:
+      ingress:
+        enabled: true
+        annotations:
+          "cert-manager.io/cluster-issuer": letsencrypt-prod
+        hosts:
+          - host: n8n.example.com
+            paths: []
+    asserts:
+      - exists:
+          path: metadata.annotations
+
+  - it: renders webhook paths when webhook is enabled
+    set:
+      ingress:
+        enabled: true
+        hosts:
+          - host: n8n.example.com
+            paths:
+              - /
+      webhook:
+        enabled: true
+      main:
+        config:
+          queue:
+            bull:
+              redis:
+                host: redis
+                port: 6379
+    asserts:
+      - exists:
+          path: spec.rules[0].http.paths
+      # Should have main path plus webhook paths (webhook, webhook-test, webhook-waiting, form)
+      - lengthEqual:
+          path: spec.rules[0].http.paths
+          count: 5
+
