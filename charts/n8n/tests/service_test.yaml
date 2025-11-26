@@ -1,0 +1,86 @@
+suite: main service
+templates:
+  - templates/service.yaml
+tests:
+  - it: does not render when service is disabled
+    set:
+      main:
+        service:
+          enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders when service is enabled
+    set:
+      main:
+        service:
+          enabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: kind
+          value: Service
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-n8n
+
+  - it: renders default ClusterIP service type
+    set:
+      main:
+        service:
+          enabled: true
+          type: ClusterIP
+    asserts:
+      - equal:
+          path: spec.type
+          value: ClusterIP
+
+  - it: renders NodePort service type
+    set:
+      main:
+        service:
+          enabled: true
+          type: NodePort
+    asserts:
+      - equal:
+          path: spec.type
+          value: NodePort
+
+  - it: renders custom service port
+    set:
+      main:
+        service:
+          enabled: true
+          port: 8080
+    asserts:
+      - equal:
+          path: spec.ports[0].port
+          value: 8080
+      - equal:
+          path: spec.ports[0].targetPort
+          value: http
+
+  - it: renders service selector with master type
+    set:
+      main:
+        service:
+          enabled: true
+    asserts:
+      - exists:
+          path: spec.selector
+      - exists:
+          path: spec.ports
+
+  - it: renders service annotations
+    set:
+      main:
+        service:
+          enabled: true
+          annotations:
+            "service.beta.kubernetes.io/aws-load-balancer-type": nlb
+    asserts:
+      - exists:
+          path: metadata.annotations
+

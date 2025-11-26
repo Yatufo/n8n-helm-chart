@@ -1,0 +1,126 @@
+suite: webhook deployment
+templates:
+  - templates/deployment.webhook.yaml
+tests:
+  - it: does not render when webhook is disabled
+    set:
+      webhook:
+        enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders when webhook is enabled
+    set:
+      webhook:
+        enabled: true
+      main:
+        config:
+          queue:
+            bull:
+              redis:
+                host: redis
+                port: 6379
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: kind
+          value: Deployment
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-n8n-webhook
+
+  - it: renders webhook container name
+    set:
+      webhook:
+        enabled: true
+      main:
+        config:
+          queue:
+            bull:
+              redis:
+                host: redis
+                port: 6379
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: n8n-webhook
+
+  - it: renders webhook command and args
+    set:
+      webhook:
+        enabled: true
+      main:
+        config:
+          queue:
+            bull:
+              redis:
+                host: redis
+                port: 6379
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].command[0]
+          value: n8n
+      - equal:
+          path: spec.template.spec.containers[0].args[0]
+          value: webhook
+
+  - it: renders custom webhook command when specified
+    set:
+      webhook:
+        enabled: true
+        command:
+          - /bin/sh
+          - -c
+      main:
+        config:
+          queue:
+            bull:
+              redis:
+                host: redis
+                port: 6379
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].command[0]
+          value: /bin/sh
+      - equal:
+          path: spec.template.spec.containers[0].command[1]
+          value: -c
+
+  - it: renders webhook type label
+    set:
+      webhook:
+        enabled: true
+      main:
+        config:
+          queue:
+            bull:
+              redis:
+                host: redis
+                port: 6379
+    asserts:
+      - exists:
+          path: spec.selector.matchLabels
+      - exists:
+          path: spec.template.metadata.labels
+
+  - it: renders replica count when autoscaling is disabled
+    set:
+      webhook:
+        enabled: true
+        replicaCount: 2
+        autoscaling:
+          enabled: false
+      main:
+        config:
+          queue:
+            bull:
+              redis:
+                host: redis
+                port: 6379
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 2
+

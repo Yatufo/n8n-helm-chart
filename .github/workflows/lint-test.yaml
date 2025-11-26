@@ -20,10 +20,15 @@ jobs:
       - name: Checkout
         uses:  actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
       - name: Set up Helm
         uses: azure/setup-helm@v4.3.0
+      - name: Install helm-unittest plugin
+        run: |
+          helm plugin install https://github.com/helm-unittest/helm-unittest.git --version v0.3.4 --verify=false || helm plugin update unittest
 
       - uses: actions/setup-python@v5
         with:
@@ -40,6 +45,11 @@ jobs:
           helm repo add bitnami https://charts.bitnami.com/bitnami
           helm repo update
 
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
       - name: Run chart-testing (list-changed)
         id: list-changed
         run: |
@@ -47,6 +57,61 @@ jobs:
           if [[ -n "$changed" ]]; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Check and auto-bump version if needed
+        if: steps.list-changed.outputs.changed == 'true' && github.event.pull_request.head.repo.full_name == github.repository
+        id: version-bump
+        run: |
+          # Get base branch version
+          git fetch origin ${{ github.event.repository.default_branch }}:refs/remotes/origin/${{ github.event.repository.default_branch }}
+          BASE_VERSION=$(git show origin/${{ github.event.repository.default_branch }}:charts/n8n/Chart.yaml | grep '^version:' | sed 's/version: *//' | tr -d '"' | tr -d "'" | xargs)
+          
+          # Get PR branch version
+          PR_VERSION=$(grep '^version:' charts/n8n/Chart.yaml | sed 's/version: *//' | tr -d '"' | tr -d "'" | xargs)
+          
+          echo "Base version: $BASE_VERSION"
+          echo "PR version: $PR_VERSION"
+          
+          if [[ "$PR_VERSION" == "$BASE_VERSION" ]]; then
+            echo "⚠️ Version not bumped! Auto-bumping..."
+            echo "needs_bump=true" >> "$GITHUB_OUTPUT"
+            
+            # Determine bump type from commit messages
+            COMMITS=$(git log origin/${{ github.event.repository.default_branch }}..HEAD --pretty=format:"%s")
+            BUMP_TYPE="patch"
+            
+            if echo "$COMMITS" | grep -qiE "(BREAKING CHANGE|!:|major)"; then
+              BUMP_TYPE="major"
+            elif echo "$COMMITS" | grep -qiE "^feat\(|^feat:"; then
+              BUMP_TYPE="minor"
+            fi
+            
+            echo "Bump type: $BUMP_TYPE"
+            echo "bump_type=$BUMP_TYPE" >> "$GITHUB_OUTPUT"
+            
+            # Bump version
+            chmod +x scripts/bump-version.sh
+            # Script outputs version to stdout, messages to stderr
+            NEW_VERSION=$(./scripts/bump-version.sh "$BUMP_TYPE")
+            echo "NEW_VERSION=$NEW_VERSION" >> "$GITHUB_ENV"
+            echo "✅ Bumped version to $NEW_VERSION"
+            
+            # Commit and push
+            git add charts/n8n/Chart.yaml
+            git commit -m "chore: bump chart version to $NEW_VERSION [skip ci]" || exit 0
+            git push || echo "Push failed (may already be up to date)"
+          else
+            echo "✅ Version already bumped: $PR_VERSION (base: $BASE_VERSION)"
+            echo "needs_bump=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run helm unittest (changed charts)
+        if: steps.list-changed.outputs.changed == 'true'
+        run: |
+          for chart in $(ct list-changed --target-branch ${{ github.event.repository.default_branch }}); do
+            echo "Running helm unittest for ${chart}"
+            helm unittest "${chart}"
+          done
 
       - name: Run chart-testing (lint)
         if: steps.list-changed.outputs.changed == 'true'
