@@ -28,7 +28,7 @@ jobs:
         uses: azure/setup-helm@v4.3.0
       - name: Install helm-unittest plugin
         run: |
-          helm plugin install https://github.com/helm-unittest/helm-unittest.git --version v0.3.4 || helm plugin update unittest
+          helm plugin install https://github.com/helm-unittest/helm-unittest.git --version v0.3.4 --verify=false || helm plugin update unittest
 
       - uses: actions/setup-python@v5
         with:
@@ -91,6 +91,7 @@ jobs:
             
             # Bump version
             chmod +x scripts/bump-version.sh
+            # Script outputs version to stdout, messages to stderr
             NEW_VERSION=$(./scripts/bump-version.sh "$BUMP_TYPE")
             echo "NEW_VERSION=$NEW_VERSION" >> "$GITHUB_ENV"
             echo "✅ Bumped version to $NEW_VERSION"

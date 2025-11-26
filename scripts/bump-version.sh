@@ -28,7 +28,7 @@ if [[ -z "$CURRENT_VERSION" ]]; then
   exit 1
 fi
 
-echo "Current version: $CURRENT_VERSION"
+echo "Current version: $CURRENT_VERSION" >&2
 
 # Parse version components
 IFS='.' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
@@ -53,7 +53,7 @@ case "$BUMP_TYPE" in
 esac
 
 NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
-echo "New version: $NEW_VERSION"
+echo "New version: $NEW_VERSION" >&2
 
 # Update Chart.yaml
 if [[ "$OSTYPE" == "darwin"* ]]; then
@@ -64,6 +64,7 @@ else
   sed -i "s/^version:.*/version: ${NEW_VERSION}/" "$CHART_YAML"
 fi
 
-echo "✅ Version bumped from $CURRENT_VERSION to $NEW_VERSION in $CHART_YAML"
+echo "✅ Version bumped from $CURRENT_VERSION to $NEW_VERSION in $CHART_YAML" >&2
+# Output only the version number to stdout for easy capture
 echo "$NEW_VERSION"
 
